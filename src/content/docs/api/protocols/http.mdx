@@ -7,7 +7,7 @@ You can control most of the playback functions of Ontime over HTTP protocol. \
 This could be handy for integration with third party software, [including vMix](/quick-tips/integrate-with-vmix).
 
 :::note[Notes on requests]
-All HTTP requests are **GET** requests. \
+All HTTP requests are **GET** requests. Even if not as semantic, this is to facilitate integrations. \
 Please mind the correct configuration for IP and Port will depend on your setup.
 
 Any request which successfully changes the Ontime playback will have a status code in the 200 range.
@@ -29,7 +29,7 @@ The following endpoints allow querying Ontime for its current state
 ### Get Ontime version
 **Request** 
 ```bash
-<localhost:4001>/api/version
+GET <localhost:4001>/api/version
 ```
 
 **Response**
@@ -40,7 +40,7 @@ The following endpoints allow querying Ontime for its current state
 ### Get Ontime runtime state
 **Request** 
 ```bash
-<localhost:4001>/api/poll
+GET <localhost:4001>/api/poll
 ```
 
 **Response** \
@@ -64,12 +64,12 @@ There is no expected payload for these GET requests
 | `/data/rundown`        | Get current rundown                                          |
 | `/data/settings`       | Get current application settings                             |
 | `/data/url-presets`    | Get currently defined [URL Presets](/features/url-presets)   |
-| `/data/view-settings`  | Get currentluy defined settings for views                    |
+| `/data/view-settings`  | Get currently defined settings for views                    |
 
 
 ## Change event
 ```bash
-<localhost:4001>/api/change/<event-id>/<property>/<value>
+GET <localhost:4001>/api/change/<event-id>/<property>/<value>
 ```
 
 The change endpoint allows changing some of the properties of a given event (below). \
@@ -89,20 +89,20 @@ You can change any field in an event using this endpoint. See below a descriptio
 | `timeWarning` | number (in seconds)                                                                                       |
 | `timeDanger`  | number (in seconds)                                                                                       |
 | `endAction`   | string (none / load-next / play-next / stop)                                                              |
-| `timerType`   | string (count-down / count-up / time-to-end / clock)                                                      |
+| `timerType`   | string (count-down / count-up / time-to-end / clock / none)                                               |
 | `duration`    | number (in seconds)                                                                                       |
 | `timeStart`   | number (in seconds)                                                                                       |
 | `timeEnd`     | number (in seconds)                                                                                       |
 
 :::caution
 Changing the properties `skip` `endAction` `duration` `timeStart` `timeEnd` \
-cause the rundown to be recalculated and writing to them are therefor therefor throttled
+cause the rundown to be recalculated and writing to them is therefore throttled
 :::
 
 ### Example: change title of event
 **Request**
 ```bash
-<localhost:4001>/api/change/<my-event-id>?title=new-title
+GET <localhost:4001>/api/change/<my-event-id>?title=new-title
 ```
 **Response**
 ```ts
@@ -115,7 +115,7 @@ See more on [custom fields](/features/custom-fields)
 
 **Request**
 ```bash
-<localhost:4001>/api/change/<my-event-id>?custom:<field-name>=new-value
+GET <localhost:4001>/api/change/<my-event-id>?custom:<field-name>=new-value
 ```
 **Response**
 ```ts
@@ -127,7 +127,7 @@ You can change multiple fields in a single request by using adding on more query
 
 **Request**
 ```bash
-<localhost:4001>/api/change/<my-event-id>?title=new-title&cue=new-cue
+GET <localhost:4001>/api/change/<my-event-id>?title=new-title&cue=new-cue
 ```
 **Response**
 ```ts
@@ -135,53 +135,89 @@ You can change multiple fields in a single request by using adding on more query
 ```
 
 ## Message
-The following endpoints allow controlling the messages Ontime sends to the views. \
-The payload response is the current state of the message data
+The following endpoints allow controlling the messages Ontime sends to the timer view. \
+The payload response is the current state of the message data.
 
 ### Example: change the external message text
 **Request**
 ```bash
-<localhost:4001>/api/message/external?text=new text
+GET <localhost:4001>/api/message/external/new text
 ```
 
 **Response**
 ```ts
 {
     "payload": {
+        "external": "new text",
         "timer": {
-            "text":"",
-            "visible":true,
-            "blink":false,
-            "blackout":false
+            "text": "",
+            "visible": true,
+            "blink": false,
+            "blackout": false,
+            "secondarySource": null
         },
-        "external": {
-            "text":"new text",
-            "visible":false
-        }
     }
 }
 ```
 
-### Example: change the external message visibility
+### Example: secondary source in the timer view
 **Request**
-```bash
-<localhost:4001>/api/message/external?visible=true
+```bash title="Show auxiliary timer as secondary field"
+<localhost:4001>/api/message/timer?secondarySource=aux
+```
+
+**Request**
+```bash title="Show external message as secondary field"
+<localhost:4001>/api/message/timer?secondarySource=external
+```
+
+**Request**
+```bash title="Hide secondary field"
+# Note: The secondary source can be `aux` or `external`, any other value will assign the property to null (ie: off)
+<localhost:4001>/api/message/timer?secondarySource=off
 ```
 
 **Response**
 ```ts
 {
     "payload": {
+        "external": "new text",
         "timer": {
-            "text":"",
-            "visible":true,
-            "blink":false,
-            "blackout":false
+            "text": "",
+            "visible": true,
+            "blink": false,
+            "blackout": false,
+            "secondarySource": "external"
         },
-        "external": {
-            "text":"new text",
-            "visible":true
-        }
+    }
+}
+```
+
+### Example: blackout timer screens
+You can remotely blackout every screen that is in the timer view.
+
+**Request**
+```bash title="Blackout timer screen"
+<localhost:4001>/api/message/timer?blackout=true
+```
+
+**Request**
+```bash title="Disable timer screen blackout"
+GET <localhost:4001>/api/message/timer?blackout=false
+```
+
+**Response**
+```ts
+{
+    "payload": {
+        "external": "",
+        "timer": {
+            "text": "",
+            "visible": true,
+            "blink": true,
+            "blackout": false,
+            "secondarySource": null
+        },
     }
 }
 ```
@@ -195,7 +231,7 @@ The payload response is the current state of the message data
 ### Start loaded event
 **Request**
 ```bash
-<localhost:4001>/api/start
+GET <localhost:4001>/api/start
 ```
 **Response**
 ```ts
@@ -205,7 +241,7 @@ The payload response is the current state of the message data
 ### Start event at index
 **Request**
 ```bash
-<localhost:4001>/api/start/index/<event-index>
+GET <localhost:4001>/api/start/index/<event-index>
 ```
 **Response**
 ```ts
@@ -215,7 +251,7 @@ The payload response is the current state of the message data
 ### Start event with ID
 **Request**
 ```bash
-<localhost:4001>/api/start/id/<event-id>
+GET <localhost:4001>/api/start/id/<event-id>
 ```
 **Response**
 ```ts
@@ -225,7 +261,7 @@ The payload response is the current state of the message data
 ### Start event with cue
 **Request**
 ```bash
-<localhost:4001>/api/start/cue/<event-cue>
+GET <localhost:4001>/api/start/cue/<event-cue>
 ```
 **Response**
 ```ts
@@ -235,7 +271,7 @@ The payload response is the current state of the message data
 ### Start next event
 **Request**
 ```bash
-<localhost:4001>/api/start/next
+GET <localhost:4001>/api/start/next
 ```
 **Response**
 ```ts
@@ -245,7 +281,7 @@ The payload response is the current state of the message data
 ### Start previous event
 **Request**
 ```bash
-<localhost:4001>/api/start/previous
+GET <localhost:4001>/api/start/previous
 ```
 **Response**
 ```ts
@@ -255,7 +291,7 @@ The payload response is the current state of the message data
 ## Pause running timer
 **Request**
 ```bash
-<localhost:4001>/api/pause
+GET <localhost:4001>/api/pause
 ```
 **Response**
 ```ts
@@ -267,7 +303,7 @@ The payload response is the current state of the message data
 ### Load event at index
 **Request**
 ```bash
-<localhost:4001>/api/load/index/<event-index>
+GET <localhost:4001>/api/load/index/<event-index>
 ```
 **Response**
 ```ts
@@ -277,7 +313,7 @@ The payload response is the current state of the message data
 ### Load event with ID
 **Request**
 ```bash
-<localhost:4001>/api/load/index/<event-id>
+GET <localhost:4001>/api/load/index/<event-id>
 ```
 **Response**
 ```ts
@@ -287,7 +323,7 @@ The payload response is the current state of the message data
 ### Load event with cue
 **Request**
 ```bash
-<localhost:4001>/api/load/index/<event-cue>
+GET <localhost:4001>/api/load/index/<event-cue>
 ```
 **Response**
 ```ts
@@ -297,7 +333,7 @@ The payload response is the current state of the message data
 ### Load next event
 **Request**
 ```bash
-<localhost:4001>/api/load/next
+GET <localhost:4001>/api/load/next
 ```
 **Response**
 ```ts
@@ -307,7 +343,7 @@ The payload response is the current state of the message data
 ### Load previous event
 **Request**
 ```bash
-<localhost:4001>/api/load/previous
+GET <localhost:4001>/api/load/previous
 ```
 **Response**
 ```ts
@@ -317,7 +353,7 @@ The payload response is the current state of the message data
 ## Reload current event
 **Request**
 ```bash
-<localhost:4001>/api/reload
+GET <localhost:4001>/api/reload
 ```
 **Response**
 ```ts
@@ -327,7 +363,7 @@ The payload response is the current state of the message data
 ## Stop playback
 **Request**
 ```bash
-<localhost:4001>/api/stop
+GET <localhost:4001>/api/stop
 ```
 **Response**
 ```ts
@@ -337,7 +373,7 @@ The payload response is the current state of the message data
 ## Activate Roll mode
 **Request**
 ```bash
-<localhost:4001>/api/roll
+GET <localhost:4001>/api/roll
 ```
 **Response**
 ```ts
@@ -348,7 +384,7 @@ The payload response is the current state of the message data
 ### Add time
 **Request**
 ```bash
-<localhost:4001>/api/addtime/add/<value-in-seconds>
+GET <localhost:4001>/api/addtime/add/<value-in-seconds>
 ```
 **Response**
 ```ts
@@ -358,7 +394,7 @@ The payload response is the current state of the message data
 ### Remove time
 **Request**
 ```bash
-<localhost:4001>/api/addtime/remove/<value-in-seconds>
+GET <localhost:4001>/api/addtime/remove/<value-in-seconds>
 ```
 **Response**
 ```ts
@@ -373,7 +409,7 @@ This can be controlled using the API as shown below
 ### Set auxiliary timer duration
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/duration/<value-in-seconds>
+GET <localhost:4001>/api/auxtimer/1/duration/<value-in-seconds>
 ```
 
 ### Set auxiliary timer direction
@@ -382,29 +418,35 @@ Auxiliary timer can count up or count down.
 #### Set auxiliary timer to count up
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/direction/count-up
+GET <localhost:4001>/api/auxtimer/1/direction/count-up
 ```
 
 #### Set auxiliary timer to count down
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/direction/count-down
+GET <localhost:4001>/api/auxtimer/1/direction/count-down
 ```
 
 ### Start auxiliary timer
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/start
+GET <localhost:4001>/api/auxtimer/1/start
 ```
 
 ### Pause auxiliary timer
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/pause
+GET <localhost:4001>/api/auxtimer/1/pause
 ```
 
 ### Stop auxiliary timer
 **Request**
 ```bash
-<localhost:4001>/api/auxtimer/1/stop
+GET <localhost:4001>/api/auxtimer/1/stop
+```
+
+### Add / remove time to auxiliary timer
+**Request**
+```bash
+GET <localhost:4001>/api/auxtimer/1/addtime/<value-in-seconds>
 ```
